@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Local Privacy Score Analyzer",
+  "version": "1.0",
+  "description": "Analyzes local history and cookies to generate a privacy score.",
+  "permissions": [
+    "history",
+    "cookies"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  }
+}
