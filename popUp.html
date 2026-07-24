@@ -4,60 +4,88 @@
   <meta charset="utf-8">
   <style>
     body {
-      width: 320px;
+      width: 360px;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 10px;
-      background-color: #f9f9f9;
+      margin: 15px;
+      background-color: #f4f6f9;
       color: #333;
     }
-    .score-container {
-      text-align: center;
-      margin: 20px 0;
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      margin-bottom: 15px;
     }
-    .score {
-      font-size: 48px;
-      font-weight: bold;
-      color: #e74c3c; /* Starts red/low */
-    }
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid #eee;
-    }
-    button {
-      width: 100%;
-      padding: 10px;
-      background-color: #3498db;
-      color: white;
+    .score-container { text-align: center; }
+    .score { font-size: 54px; font-weight: bold; }
+    .chart-container { position: relative; height: 180px; width: 100%; }
+    
+    /* Expandable Panel Styles */
+    .expand-btn {
+      background: none;
       border: none;
-      border-radius: 4px;
+      color: #3498db;
       cursor: pointer;
       font-weight: bold;
+      padding: 5px 0;
+      text-align: left;
+      font-size: 13px;
     }
-    button:hover { background-color: #2980b9; }
+    .details-panel {
+      display: none; /* Hidden by default */
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #ddd;
+      font-size: 13px;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .danger { color: #e74c3c; font-weight: bold; }
+    .warning { color: #e67e22; }
+    
+    .action-btn {
+      width: 100%;
+      padding: 12px;
+      background-color: #2c3e50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .action-btn:hover { background-color: #34495e; }
   </style>
+  <script src="chart.js"></script>
 </head>
 <body>
-  <h3>Privacy Profile Score</h3>
-  <p>An paths-based analysis of your local footprint.</p>
-  
-  <div class="score-container">
+  <div class="card score-container">
+    <h3>Local Privacy Score</h3>
     <div id="scoreDisplay" class="score">--</div>
-    <div>Out of 100</div>
+    <p id="scoreLabel" style="font-weight: 500; margin: 5px 0 0 0;"></p>
   </div>
 
-  <div class="stat-row">
-    <span>Tracked History Items:</span>
-    <span id="historyCount">0</span>
-  </div>
-  <div class="stat-row">
-    <span>Stored Cookies:</span>
-    <span id="cookieCount">0</span>
+  <div class="card">
+    <h4>Data Breakdown</h4>
+    <div class="chart-container">
+      <canvas id="privacyChart"></canvas>
+    </div>
+    
+    <!-- New Expandable Section -->
+    <button id="toggleDetailsBtn" class="expand-btn">▶ View Raw Vulnerability Data</button>
+    <div id="detailsPanel" class="details-panel">
+      <div class="detail-row"><span>Standard History Links:</span> <span id="rawSafeHist">0</span></div>
+      <div class="detail-row"><span>Tracker/Ad Links Visited:</span> <span id="rawTrackHist" class="danger">0</span></div>
+      <div class="detail-row"><span>First-Party Cookies:</span> <span id="rawFirstParty">0</span></div>
+      <div class="detail-row"><span>Third-Party Trackers:</span> <span id="rawThirdParty" class="danger">0</span></div>
+    </div>
   </div>
   
-  <br>
-  <button id="analyzeBtn">Analyze Footprint</button>
+  <button id="analyzeBtn" class="action-btn">Run Deep Analysis</button>
 
   <script src="popup.js"></script>
 </body>
