@@ -1,89 +1,77 @@
-let privacyChart = null;
-
-const TRACKER_BLOCKLIST = [
+// Default fallback list if user hasn't configured custom trackers
+const DEFAULT_BLOCKLIST = [
   'doubleclick.net', 'google-analytics.com', 'analytics.', 
   'facebook.com/tr', 'scorecardresearch.com', 'adnxs.com', 
-  'amazon-adsystem.com', 'hotjar.com'
+  'amazon-adsystem.com', 'hotjar.com', 'criteo.com'
 ];
 
-// Toggle Detail Panel Logic
-document.getElementById('toggleDetailsBtn').addEventListener('click', (e) => {
-  const panel = document.getElementById('detailsPanel');
-  if (panel.style.display === 'block') {
-    panel.style.display = 'none';
-    e.target.textContent = '▶ View Raw Vulnerability Data';
-  } else {
-    panel.style.display = 'block';
-    e.target.textContent = '▼ Hide Raw Vulnerability Data';
-  }
+document.getElementById('openOptions').addEventListener('click', (e) => {
+  e.preventDefault();
+  chrome.runtime.openOptionsPage();
 });
 
 document.getElementById('analyzeBtn').addEventListener('click', async () => {
+  // 1. Fetch user-defined blocklist from storage or fallback to default
+  const storage = await chrome.storage.local.get(['customBlocklist']);
+  const trackerBlocklist = storage.customBlocklist || DEFAULT_BLOCKLIST;
+
+  // 2. Query History & Cookies
   const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-  const historyItems = await chrome.history.search({ text: '', startTime: oneWeekAgo, maxResults: 10000 });
-  const allCookies = await chrome.cookies.getAll({});
+  const historyItems = await chrome.history.search({ text: '', startTime: oneWeekAgo, maxResults: 5000 });
+  const cookies = await chrome.cookies.getAll({});
 
-  let trackerHistoryCount = 0;
-  let standardHistoryCount = 0;
-  let thirdPartyCookies = 0;
-  let firstPartyCookies = 0;
-
+  // 3. Count Tracker Matches in History
+  let trackerMatches = 0;
   historyItems.forEach(item => {
-    const url = item.url.toLowerCase();
-    if (TRACKER_BLOCKLIST.some(domain => url.includes(domain))) {
-      trackerHistoryCount++;
-    } else {
-      standardHistoryCount++;
+    if (trackerBlocklist.some(domain => item.url.includes(domain))) {
+      trackerMatches++;
     }
   });
 
-  allCookies.forEach(cookie => {
-    if (cookie.sameSite === 'no_restriction' || cookie.domain.startsWith('.')) {
-      thirdPartyCookies++;
-    } else {
-      firstPartyCookies++;
-    }
-  });
+  // 4. Update Counts in UI
+  document.getElementById('historyCount').textContent = historyItems.length;
+  document.getElementById('cookieCount').textContent = cookies.length;
+  document.getElementById('trackerCount').textContent = trackerMatches;
 
-  // Math Deductions
-  let score = 100;
-  score -= (standardHistoryCount * 0.01 + trackerHistoryCount * 1.5 + firstPartyCookies * 0.05 + thirdPartyCookies * 0.4);
-  score = Math.max(0, Math.min(100, Math.round(score)));
+  // 5. Calculate Score
+  const baseScore = 100;
+  const historyDeduction = Math.min(25, Math.floor(historyItems.length / 50));
+  const cookieDeduction = Math.min(35, Math.floor(cookies.length / 20));
+  const trackerDeduction = Math.min(40, trackerMatches * 1.5);
 
-  // Populate UI Text Elements
-  document.getElementById('scoreDisplay').textContent = score;
-  document.getElementById('rawSafeHist').textContent = standardHistoryCount;
-  document.getElementById('rawTrackHist').textContent = trackerHistoryCount;
-  document.getElementById('rawFirstParty').textContent = firstPartyCookies;
-  document.getElementById('rawThirdParty').textContent = thirdPartyCookies;
+  const finalScore = Math.max(0, Math.round(baseScore - historyDeduction - cookieDeduction - trackerDeduction));
 
+  // 6. Update Score UI & Colors
   const scoreDisplay = document.getElementById('scoreDisplay');
-  const scoreLabel = document.getElementById('scoreLabel');
-  if (score > 75) {
-    scoreDisplay.style.color = '#2ecc71'; scoreLabel.textContent = "Excellent: Minimal Footprint"; scoreLabel.style.color = '#2ecc71';
-  } else if (score > 40) {
-    scoreDisplay.style.color = '#f1c40f'; scoreLabel.textContent = "Warning: Moderate Exposure"; scoreLabel.style.color = '#f1c40f';
+  scoreDisplay.textContent = finalScore;
+
+  if (finalScore > 75) {
+    scoreDisplay.style.color = '#2ecc71';
+  } else if (finalScore > 40) {
+    scoreDisplay.style.color = '#f1c40f';
   } else {
-    scoreDisplay.style.color = '#e74c3c'; scoreLabel.textContent = "Critical Risk: High Vulnerability"; scoreLabel.style.color = '#e74c3c';
+    scoreDisplay.style.color = '#e74c3c';
   }
 
-  // Render Chart
-  if (privacyChart) { privacyChart.destroy(); }
-  const ctx = document.getElementById('privacyChart').getContext('2d');
-  privacyChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Safe History', 'Tracker Links', '1st Party', '3rd Party'],
-      datasets: [{
-        data: [standardHistoryCount, trackerHistoryCount, firstPartyCookies, thirdPartyCookies],
-        backgroundColor: ['#3498db', '#e74c3c', '#2ecc71', '#e67e22'],
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } }
+  // 7. Dynamic Score Explanation & Guidance
+  const explanationTitle = document.getElementById('explanationTitle');
+  const explanationText = document.getElementById('explanationText');
+  const remediationDetails = document.getElementById('remediationDetails');
+
+  remediationDetails.style.display = 'block';
+
+  if (finalScore <= 40) {
+    explanationTitle.textContent = "High Privacy Risk detected";
+    if (trackerMatches > 10) {
+      explanationText.textContent = `Your score dropped mainly because ${trackerMatches} known tracking endpoints were detected in your recent browsing history.`;
+    } else {
+      explanationText.textContent = `Your score dropped primarily due to a high accumulation of ${cookies.length} stored cookies and ${historyItems.length} history records.`;
     }
-  });
+  } else if (finalScore <= 75) {
+    explanationTitle.textContent = "Moderate Privacy Footprint";
+    explanationText.textContent = "Your local browser storage shows a moderate accumulation of session tracking data across routinely visited sites.";
+  } else {
+    explanationTitle.textContent = "Clean Privacy Footprint";
+    explanationText.textContent = "Minimal tracking footprints detected in local storage. Your browser environment is currently well-maintained.";
+  }
 });
